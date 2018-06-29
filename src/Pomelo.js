@@ -17,12 +17,14 @@ function defaultDecode(data) {
     msg.body = JSON.parse(Protocol.strdecode(msg.body));
     return msg;
 }
+
 function defaultEncode(reqId, route, msg) {
     const type = reqId ? Message.TYPE_REQUEST : Message.TYPE_NOTIFY;
     msg = Protocol.strencode(JSON.stringify(msg));
     const compressRoute = 0;
     return Message.encode(reqId, type, compressRoute, route, msg);
 }
+
 function defaultUrlGenerator(host, port) {
     let url = 'ws://' + host;
     if (port) {
@@ -34,7 +36,10 @@ function defaultUrlGenerator(host, port) {
 module.exports = class Pomelo extends EventEmitter {
     constructor(args) {
         super(args);
-        const {wsCreator, urlGenerator = defaultUrlGenerator} = args;
+        const {
+            wsCreator,
+            urlGenerator = defaultUrlGenerator
+        } = args;
         this.wsCreator = wsCreator;
         this.urlGenerator = urlGenerator;
 
@@ -49,14 +54,13 @@ module.exports = class Pomelo extends EventEmitter {
                 version: JS_WS_CLIENT_VERSION,
                 rsa: {}
             },
-            'user': {
-            }
+            'user': {}
         };
 
         this.heartbeatInterval = 0;
         this.heartbeatTimeout = 0;
         this.nextHeartbeatTimeout = 0;
-        this.gapThreshold = 100;   // heartbeat gap threashold
+        this.gapThreshold = 100; // heartbeat gap threashold
         this.heartbeatId = null;
         this.heartbeatTimeoutId = null;
         this.handshakeCallback = null;
@@ -76,39 +80,39 @@ module.exports = class Pomelo extends EventEmitter {
             this.emit('error', 'client version not fullfill');
             return;
         }
-    
+
         if (data.code !== RES_OK) {
             this.emit('error', 'handshake fail');
             return;
         }
         this.handshakeInit(data);
-    
+
         const obj = Package.encode(Package.TYPE_HANDSHAKE_ACK);
         this.send(obj);
         this.initCallback && this.initCallback(this.socket);
     }
     handshakeInit(data) {
         if (data.sys && data.sys.heartbeat) {
-            this.heartbeatInterval = data.sys.heartbeat * 1000;   // heartbeat interval
-            this.heartbeatTimeout = this.heartbeatInterval * 2;   // max heartbeat timeout
+            this.heartbeatInterval = data.sys.heartbeat * 1000; // heartbeat interval
+            this.heartbeatTimeout = this.heartbeatInterval * 2; // max heartbeat timeout
         } else {
             this.heartbeatInterval = 0;
             this.heartbeatTimeout = 0;
         }
-    
+
         typeof this.handshakeCallback === 'function' && this.handshakeCallback(data.user);
     }
     heartbeat(data) {
         if (!this.heartbeatInterval) {
             return;
         }
-    
+
         const obj = Package.encode(Package.TYPE_HEARTBEAT);
         if (this.heartbeatTimeoutId) {
             clearTimeout(this.heartbeatTimeoutId);
             this.heartbeatTimeoutId = null;
         }
-    
+
         if (this.heartbeatId) {
             // already in a heartbeat interval
             return;
@@ -116,7 +120,7 @@ module.exports = class Pomelo extends EventEmitter {
         this.heartbeatId = setTimeout(() => {
             this.heartbeatId = null;
             this.send(obj);
-    
+
             this.nextHeartbeatTimeout = Date.now() + this.heartbeatTimeout;
             this.heartbeatTimeoutId = setTimeout(this.heartbeatTimeoutCb.bind(this), this.heartbeatTimeout);
         }, this.heartbeatInterval);
@@ -139,15 +143,22 @@ module.exports = class Pomelo extends EventEmitter {
     }
     init(params, cb) {
         this.initCallback = cb;
-        
+
         this.params = params;
-        const {host, port, user, handshakeCallback, encode = defaultEncode, decode = defaultDecode} = params;
+        const {
+            host,
+            port,
+            user,
+            handshakeCallback,
+            encode = defaultEncode,
+            decode = defaultDecode
+        } = params;
 
         this.encode = encode;
         this.decode = decode;
-        
+
         this.url = this.urlGenerator(host, port);
-    
+
         this.handshakeBuffer.user = user;
         this.handshakeCallback = handshakeCallback;
         this.connect();
@@ -156,7 +167,7 @@ module.exports = class Pomelo extends EventEmitter {
         const params = this.params;
         const maxReconnectAttempts = params.maxReconnectAttempts || DEFAULT_MAX_RECONNECT_ATTEMPTS;
         const reconnectUrl = this.url;
-    
+
         const onOpen = event => {
             if (!!this.reconnect) {
                 this.emit('reconnect');
@@ -184,9 +195,18 @@ module.exports = class Pomelo extends EventEmitter {
                 this.reconnectAttempts++;
                 this.reconncetTimer = setTimeout(() => this.connect(), reconnectionDelay);
                 this.reconnectionDelay *= 2;
+            } else {
+                if (this.heartbeatId) {
+                    clearTimeout(this.heartbeatId);
+                    this.heartbeatId = null;
+                }
+                if (this.heartbeatTimeoutId) {
+                    clearTimeout(this.heartbeatTimeoutId);
+                    this.heartbeatTimeoutId = null;
+                }
             }
         };
-    
+
         // socket = wx.connectSocket({ url: reconnectUrl });
         this.socket = this.wsCreator({
             url: reconnectUrl,
@@ -201,7 +221,7 @@ module.exports = class Pomelo extends EventEmitter {
             this.socket.close();
             this.socket = false;
         }
-    
+
         if (this.heartbeatId) {
             clearTimeout(this.heartbeatId);
             this.heartbeatId = null;
@@ -222,10 +242,10 @@ module.exports = class Pomelo extends EventEmitter {
         if (!route) {
             return;
         }
-    
+
         this.reqId++;
         this.sendMessage(this.reqId, route, msg);
-    
+
         this.callbacks[this.reqId] = cb;
     }
     notify(route, msg) {
@@ -234,12 +254,14 @@ module.exports = class Pomelo extends EventEmitter {
     }
     sendMessage(reqId, route, msg) {
         msg = this.encode(reqId, route, msg);
-    
+
         const packet = Package.encode(Package.TYPE_DATA, msg);
         this.send(packet);
     }
     send(packet) {
-        this.socket.send({ data: packet.buffer });
+        this.socket.send({
+            data: packet.buffer
+        });
     }
     onData(msg) {
         msg = this.decode(msg);
@@ -254,10 +276,10 @@ module.exports = class Pomelo extends EventEmitter {
             this.emit(msg.route, msg.body);
             return;
         }
-    
+
         //if have a id then find the callback function with the request
         const cb = this.callbacks[msg.id];
-    
+
         delete this.callbacks[msg.id];
         typeof cb === 'function' && cb(msg.body);
     }
