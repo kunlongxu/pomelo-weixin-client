@@ -132,7 +132,7 @@ module.exports = class Pomelo extends EventEmitter {
         } else {
             console.error('server heartbeat timeout');
             this.emit('heartbeat timeout');
-            this.disconnect();
+            this.disconnect().then(function () {});
         }
     }
     reset() {
@@ -217,19 +217,32 @@ module.exports = class Pomelo extends EventEmitter {
         });
     }
     disconnect() {
-        if (this.socket) {
-            this.socket.close();
-            this.socket = false;
-        }
+        return new Promise((resolve, reject) => {
+            if (this.socket) {
+                this.socket.close({
+                    success: function (res) {
+                        console.log('gameClient: socket closed.')
+                        resolve(res)
+                    },
+                    fail: function (err) {
+                        console.log('gameClient: socket close error.')
+                        reject(err)
+                    }
+                });
+                this.socket = false;
+            } else {
+                resolve()
+            }
 
-        if (this.heartbeatId) {
-            clearTimeout(this.heartbeatId);
-            this.heartbeatId = null;
-        }
-        if (this.heartbeatTimeoutId) {
-            clearTimeout(this.heartbeatTimeoutId);
-            this.heartbeatTimeoutId = null;
-        }
+            if (this.heartbeatId) {
+                clearTimeout(this.heartbeatId);
+                this.heartbeatId = null;
+            }
+            if (this.heartbeatTimeoutId) {
+                clearTimeout(this.heartbeatTimeoutId);
+                this.heartbeatTimeoutId = null;
+            }
+        })
     }
     request(route, msg, cb) {
         if (arguments.length === 2 && typeof msg === 'function') {
