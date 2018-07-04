@@ -196,6 +196,7 @@ module.exports = class Pomelo extends EventEmitter {
                 this.reconncetTimer = setTimeout(() => this.connect(), reconnectionDelay);
                 this.reconnectionDelay *= 2;
             } else {
+                this.socket = false;
                 if (this.heartbeatId) {
                     clearTimeout(this.heartbeatId);
                     this.heartbeatId = null;
